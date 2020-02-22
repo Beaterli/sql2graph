@@ -12,7 +12,7 @@ object DumpGraphToText {
             HikariConfig(
                 mapOf(
                     "dataSourceClassName" to "org.sqlite.SQLiteDataSource",
-                    "dataSource.url" to "jdbc:sqlite:F:/scrappy_weibo.db",
+                    "dataSource.url" to "jdbc:sqlite:F:/Graduation-Project/scrappy_weibo.db",
                     "maximumPoolSize" to "1"
                 ).toProperties()
             )
