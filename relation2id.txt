@@ -1,0 +1,6 @@
+keyword	0
+repost	1
+comment	2
+reference	3
+create	4
+type	5

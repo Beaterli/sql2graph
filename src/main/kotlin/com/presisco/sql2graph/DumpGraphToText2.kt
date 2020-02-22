@@ -26,11 +26,13 @@ object DumpGraphToText2 {
 
     val relationFile = "relation2id.txt"
 
-    val graphFile = "train2id.txt"
+    val graphFile = "graph.txt"
 
-    val trainFile = "train.pairs"
+    val trainFile = "train.txt"
 
-    val testFile = "test.pairs"
+    val testFile = "test.txt"
+
+    val validFile = "valid.txt"
 
     val episodeFile = "episodes.json"
 
@@ -221,8 +223,8 @@ object DumpGraphToText2 {
                 val to = row.getString("mid")
                 relationList.addAll(
                     buildBidirection(
-                        "user_$from",
-                            "create",
+                        "blog_user_$from",
+                        "create",
                         "blog_$to"
 
                     )
@@ -236,10 +238,9 @@ object DumpGraphToText2 {
                 val to = row.getString("cid")
                 relationList.addAll(
                     buildBidirection(
-                        "user_$from",
-                            "create",
+                        "blog_user_$from",
+                        "create",
                         "comment_$to"
-
                     )
                 )
             }
@@ -266,17 +267,27 @@ object DumpGraphToText2 {
         return relationList
     }
 
-    fun dumpRelationAsTrainAndTest(relations: List<Triple<Int, Int, Int>>, testRadio: Float = 0.25f) {
-        val shuffled = relations.filter { it.third % 2 == 0 }.shuffled()
+    fun dumpRelationAsTrainAndTest(relations: List<Triple<String, String, String>>, testRadio: Float = 0.25f) {
+        val shuffled = relations.shuffled()
+
         val trainSize = (shuffled.size * (1.0f - testRadio)).toInt()
+        val testSize = (shuffled.size - trainSize) / 2
+
         val trainSet = shuffled.subList(0, trainSize - 1)
-        val testSet = shuffled.subList(trainSize, shuffled.size - 1)
+        val testSet = shuffled.subList(trainSize, trainSize + testSize - 1)
+        val validSet = shuffled.subList(trainSize + testSize, shuffled.size - 1)
+
         val trainWritter = File(trainFile).bufferedWriter()
         val testWritter = File(testFile).bufferedWriter()
+        val validWritter = File(validFile).bufferedWriter()
+
         trainSet.forEach { trainWritter.write("${it.first}\t${it.second}\t${it.third}\n") }
         testSet.forEach { testWritter.write("${it.first}\t${it.second}\t${it.third}\n") }
+        validSet.forEach { validWritter.write("${it.first}\t${it.second}\t${it.third}\n") }
+
         trainWritter.close()
         testWritter.close()
+        validWritter.close()
     }
 
     @JvmStatic
@@ -286,8 +297,12 @@ object DumpGraphToText2 {
         val userEntities = getEntities("blog_user", "uid")
         val tagEntities = getEntities("tag", "tid")
         val commentEntities = getEntities("comment", "cid")
+        val typeEntities = listOf(
+                "type_entertainment",
+                "type_political"
+        )
 
-        val entityToIndex = buildEntityIndex(keywordEntities, blogEntities, userEntities, commentEntities, tagEntities)
+        val entityToIndex = buildEntityIndex(typeEntities, keywordEntities, blogEntities, userEntities, commentEntities, tagEntities)
 
         val relationSet = arrayListOf<Triple<String, String, String>>()
         with(relationSet) {
@@ -302,6 +317,8 @@ object DumpGraphToText2 {
         val writter = File(graphFile).bufferedWriter()
         relationSet.forEach { triple -> writter.write("${triple.first}\t${triple.second}\t${triple.third}\n") }
         writter.close()
+
+        dumpRelationAsTrainAndTest(relationSet)
     }
 
 
