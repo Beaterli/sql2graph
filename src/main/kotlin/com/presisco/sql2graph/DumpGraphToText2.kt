@@ -11,9 +11,12 @@ object DumpGraphToText2 {
         HikariDataSource(
             HikariConfig(
                 mapOf(
-                    "dataSourceClassName" to "org.sqlite.SQLiteDataSource",
-                    "dataSource.url" to "jdbc:sqlite:F:/scrappy_weibo.db",
-                    "maximumPoolSize" to "1"
+                    "dataSourceClassName" to "com.mysql.cj.jdbc.MysqlDataSource",
+                    "dataSource.url" to "jdbc:mysql://localhost:3306/weibo?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8",
+                    "dataSource.user" to "root",
+                    "dataSource.password" to  "root",
+                    "maximumPoolSize" to "5",
+                    "connectionTimeout" to "5000"
                 ).toProperties()
             )
         )
@@ -31,14 +34,21 @@ object DumpGraphToText2 {
 
     val episodeFile = "episodes.json"
 
+//    val relations = listOf(
+//        "keyword", "keyword_inv",
+//        "repost", "repost_inv",
+//        "comment", "comment_inv",
+//        "reference", "reference_inv",
+//        "create", "create_inv",
+//        "entertainment", "entertainment_inv",
+//        "political", "political_inv"
+//    )
     val relations = listOf(
-        "keyword", "keyword_inv",
-        "repost", "repost_inv",
-        "comment", "comment_inv",
-        "reference", "reference_inv",
-        "create", "create_inv",
-        "entertainment", "entertainment_inv",
-        "political", "political_inv"
+            "keyword",
+            "repost",
+            "comment",
+            "reference",
+            "create"
     )
 
     val entertainmentKeywords = setOf(
@@ -109,13 +119,13 @@ object DumpGraphToText2 {
         writter.close()
     }
 
-    fun buildBidirection(from: Int, to: Int, relation: String) = listOf(
-        Triple(from, to, relations.indexOf(relation)),
-        Triple(to, from, relations.indexOf("${relation}_inv"))
+    fun buildBidirection(from: String, relation: String, to: String) = listOf(
+        Triple(from, relation, to)
+        //Triple(to, "${relation}_inv", from)
     )
 
-    fun buildKeywordRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
-        val relationList = arrayListOf<Triple<Int, Int, Int>>()
+    fun buildKeywordRelation(): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
         db.buildSelect("mid", "keyword")
             .from("root")
             .execute()
@@ -124,21 +134,21 @@ object DumpGraphToText2 {
                 val to = row.getString("mid")
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["root_$from"]!!,
-                        entityToIndex["blog_$to"]!!,
-                        "keyword"
+                        "root_$from",
+                            "keyword",
+                        "blog_$to"
+
                     )
                 )
             }
         return relationList
     }
 
-    fun buildRepostRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
-        val relationList = arrayListOf<Triple<Int, Int, Int>>()
-        db.buildSelect("mid", "repost_id")
-            .from("blog")
-            .where("repost_id", "is not", "null")
-            .execute()
+    fun buildRepostRelation(entityToIndex: Map<String, Int>): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
+        db.select("SELECT mid, repost_id\n" +
+                "FROM `blog`\n" +
+                "WHERE repost_id is not null")
             .filter { row ->
                 val from = row.getString("repost_id")
                 if (!entityToIndex.containsKey("blog_$from")) {
@@ -147,42 +157,42 @@ object DumpGraphToText2 {
                 } else {
                     true
                 }
-            }.forEach { row ->
+            }
+            .forEach { row ->
                 val from = row.getString("repost_id")
                 val to = row.getString("mid")
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["blog_$from"]!!,
-                        entityToIndex["blog_$to"]!!,
-                        "repost"
+                        "blog_$from",
+                            "repost",
+                        "blog_$to"
                     )
                 )
             }
         return relationList
     }
 
-    fun buildCommentRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
-        val relationList = arrayListOf<Triple<Int, Int, Int>>()
-        db.buildSelect("mid", "cid")
-            .from("comment")
-            .where("mid", "is not", "null")
-            .execute()
+    fun buildCommentRelation(): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
+        db.select("SELECT mid, cid\n" +
+                "FROM `comment`\n" +
+                "WHERE mid is not null")
             .forEach { row ->
                 val from = row.getString("cid")
                 val to = row.getString("mid")
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["comment_$from"]!!,
-                        entityToIndex["blog_$to"]!!,
-                        "comment"
+                        "comment_$from",
+                            "comment",
+                        "blog_$to"
                     )
                 )
             }
         return relationList
     }
 
-    fun buildReferenceRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
-        val relationList = arrayListOf<Triple<Int, Int, Int>>()
+    fun buildReferenceRelation(): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
         db.buildSelect("mid", "tid")
             .from("blog_with_tag")
             .execute()
@@ -191,44 +201,44 @@ object DumpGraphToText2 {
                 val to = row["tid"].toString()
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["blog_$from"]!!,
-                        entityToIndex["tag_$to"]!!,
-                        "reference"
+                        "blog_$from",
+                            "reference",
+                        "tag_$to"
                     )
                 )
             }
         return relationList
     }
 
-    fun buildCreateRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
-        val relationList = arrayListOf<Triple<Int, Int, Int>>()
-        db.buildSelect("mid", "uid")
-            .from("blog")
-            .where("uid", "is not", "null")
-            .execute()
+    fun buildCreateRelation(): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
+        db.select("SELECT mid, uid\n" +
+                "FROM `blog`\n" +
+                "WHERE uid is not null")
             .forEach { row ->
                 val from = row.getString("uid")
                 val to = row.getString("mid")
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["user_$from"]!!,
-                        entityToIndex["blog_$to"]!!,
-                        "create"
+                        "user_$from",
+                            "create",
+                        "blog_$to"
+
                     )
                 )
             }
-        db.buildSelect("cid", "uid")
-            .from("comment")
-            .where("uid", "is not", "null")
-            .execute()
+        db.select("SELECT cid, uid\n" +
+                "FROM `comment`\n" +
+                "WHERE cid is not null")
             .forEach { row ->
                 val from = row.getString("uid")
                 val to = row.getString("cid")
                 relationList.addAll(
                     buildBidirection(
-                        entityToIndex["user_$from"]!!,
-                        entityToIndex["comment_$to"]!!,
-                        "create"
+                        "user_$from",
+                            "create",
+                        "comment_$to"
+
                     )
                 )
             }
@@ -252,19 +262,19 @@ object DumpGraphToText2 {
     fun main(vararg args: String) {
         val keywordEntities = getDistinctEntities("root", "keyword")
         val blogEntities = getEntities("blog", "mid")
-        val userEntities = getEntities("user", "uid")
+        val userEntities = getEntities("blog_user", "uid")
         val tagEntities = getEntities("tag", "tid")
         val commentEntities = getEntities("comment", "cid")
 
         val entityToIndex = buildEntityIndex(keywordEntities, blogEntities, userEntities, commentEntities, tagEntities)
 
-        val relationSet = arrayListOf<Triple<Int, Int, Int>>()
+        val relationSet = arrayListOf<Triple<String, String, String>>()
         with(relationSet) {
-            addAll(buildKeywordRelation(entityToIndex))
+            addAll(buildKeywordRelation())
             addAll(buildRepostRelation(entityToIndex))
-            addAll(buildCommentRelation(entityToIndex))
-            addAll(buildReferenceRelation(entityToIndex))
-            addAll(buildCreateRelation(entityToIndex))
+            addAll(buildCommentRelation())
+            addAll(buildReferenceRelation())
+            addAll(buildCreateRelation())
         }
 
         val writter = File(graphFile).bufferedWriter()
