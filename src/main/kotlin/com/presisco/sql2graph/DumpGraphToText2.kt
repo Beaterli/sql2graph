@@ -48,7 +48,8 @@ object DumpGraphToText2 {
             "repost",
             "comment",
             "reference",
-            "create"
+            "create",
+            "type"
     )
 
     val entertainmentKeywords = setOf(
@@ -245,6 +246,26 @@ object DumpGraphToText2 {
         return relationList
     }
 
+    fun buildTypeRelation(): List<Triple<String, String, String>> {
+        val relationList = arrayListOf<Triple<String, String, String>>()
+        db.select("SELECT DISTINCT(keyword),type \n" +
+                "FROM `root` \n" +
+                "WHERE type is not null")
+                .forEach { row ->
+                    val from = row.getString("keyword")
+                    val to = row.getString("type")
+                    relationList.addAll(
+                            buildBidirection(
+                                    "root_$from",
+                                    "type",
+                                    "type_$to"
+
+                            )
+                    )
+                }
+        return relationList
+    }
+
     fun dumpRelationAsTrainAndTest(relations: List<Triple<Int, Int, Int>>, testRadio: Float = 0.25f) {
         val shuffled = relations.filter { it.third % 2 == 0 }.shuffled()
         val trainSize = (shuffled.size * (1.0f - testRadio)).toInt()
@@ -275,6 +296,7 @@ object DumpGraphToText2 {
             addAll(buildCommentRelation())
             addAll(buildReferenceRelation())
             addAll(buildCreateRelation())
+            addAll(buildTypeRelation())
         }
 
         val writter = File(graphFile).bufferedWriter()
