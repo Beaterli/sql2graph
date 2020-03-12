@@ -310,7 +310,7 @@ object DumpGraphToText2 {
                         val from = row.getString("mid")
                         relationList.addAll(
                                 buildBidirection(
-                                        "bolg_$from",
+                                        "blog_$from",
                                         "type",
                                         "type_entertainment"
 
@@ -371,7 +371,7 @@ object DumpGraphToText2 {
                         val from = row.getString("mid")
                         relationList.addAll(
                                 buildBidirection(
-                                        "bolg_$from",
+                                        "blog_$from",
                                         "type",
                                         "type_political"
 
