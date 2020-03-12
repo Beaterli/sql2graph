@@ -4,6 +4,7 @@ import com.presisco.lazyjdbc.client.MapJdbcClient
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.io.File
+import java.util.*
 
 object DumpGraphToText3 {
 
@@ -235,6 +236,8 @@ object DumpGraphToText3 {
 
     fun buildTypeRelation(entityToIndex: Map<String, Int>): List<Triple<Int, Int, Int>> {
         val relationList = arrayListOf<Triple<Int, Int, Int>>()
+        val typeQueue1: Queue<String> = LinkedList()
+        val typeQueue2: Queue<String> = LinkedList()
         db.select("SELECT DISTINCT(keyword),type \n" +
                 "FROM `root` \n" +
                 "WHERE type is not null")
@@ -249,6 +252,116 @@ object DumpGraphToText3 {
                             )
                     )
                 }
+
+        entertainmentKeywords.forEach{ it ->
+            db.select("SELECT mid\n" +
+                            "FROM `root`\n" +
+                            "WHERE keyword = ? ",it)
+                    .forEach { row ->
+                        val from = row.getString("mid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["blog_$from"]!!,
+                                        entityToIndex["type_entertainment"]!!,
+                                        "type"
+
+                                )
+                        )
+                        println("type1————mid:" + from)
+                        typeQueue1.offer(from)
+                    }
+        }
+        while(typeQueue1.isNotEmpty()){
+            if(relationList.size > 30000) break
+            db.select("SELECT mid\n" +
+                            "FROM `blog`\n" +
+                            "WHERE repost_id = ?",typeQueue1.peek())
+                    .forEach{ row ->
+                        val from = row.getString("mid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["blog_$from"]!!,
+                                        entityToIndex["type_entertainment"]!!,
+                                        "type"
+
+                                )
+                        )
+                        typeQueue1.offer(from)
+                        println("type1————mid_reposit:" + from)
+                    }
+            //
+            db.select("SELECT cid\n" +
+                            "FROM `comment`\n" +
+                            "WHERE mid = ? ",typeQueue1.poll())
+                    .forEach{ row ->
+                        val from = row.getString("cid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["comment_$from"]!!,
+                                        entityToIndex["type_entertainment"]!!,
+                                        "type"
+
+                                )
+                        )
+                        println("type1————cid:" + from)
+                    }
+        }
+
+
+        politicalKeywords.forEach{ it ->
+            db.select("SELECT mid\n" +
+                            "FROM `root`\n" +
+                            "WHERE keyword = ? ",it)
+                    .forEach { row ->
+                        val from = row.getString("mid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["blog_$from"]!!,
+                                        entityToIndex["type_political"]!!,
+                                        "type"
+
+                                )
+                        )
+                        println("type2————mid:" + from)
+                        typeQueue2.offer(from)
+                    }
+        }
+        while(typeQueue2.isNotEmpty()){
+            if(relationList.size > 30000 * 2) break
+            db.select("SELECT mid\n" +
+                            "FROM `blog`\n" +
+                            "WHERE repost_id = ?",typeQueue2.peek())
+                    .forEach{ row ->
+                        val from = row.getString("mid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["blog_$from"]!!,
+                                        entityToIndex["type_political"]!!,
+                                        "type"
+
+                                )
+                        )
+                        typeQueue2.offer(from)
+                        println("type2————mid_reposit:" + from)
+                    }
+            //
+            db.select("SELECT cid\n" +
+                            "FROM `comment`\n" +
+                            "WHERE mid = ? ",typeQueue2.poll())
+                    .forEach{ row ->
+                        val from = row.getString("cid")
+                        relationList.addAll(
+                                buildBidirection(
+                                        entityToIndex["comment_$from"]!!,
+                                        entityToIndex["type_political"]!!,
+                                        "type"
+
+                                )
+                        )
+                        println("type2————cid:" + from)
+                    }
+        }
+        println(relationList.size)
         return relationList
     }
 
